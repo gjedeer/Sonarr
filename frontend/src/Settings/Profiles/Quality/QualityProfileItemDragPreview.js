@@ -50,11 +50,14 @@ class QualityProfileItemDragPreview extends Component {
     };
 
     const {
+      groupId,
       qualityId,
       name,
       allowed,
       sortIndex
     } = item;
+
+    // TODO: Show a different preview for groups
 
     return (
       <DragPreviewLayer>
@@ -63,7 +66,7 @@ class QualityProfileItemDragPreview extends Component {
           style={style}
         >
           <QualityProfileItem
-            qualityId={qualityId}
+            qualityId={groupId || qualityId}
             name={name}
             allowed={allowed}
             sortIndex={sortIndex}

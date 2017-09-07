@@ -164,7 +164,7 @@ namespace NzbDrone.Core.MediaFiles
                 _logger.Debug("{0} folder quality: {1}", cleanedUpName, folderInfo.Quality);
             }
 
-            var videoFiles = _diskScanService.GetVideoFiles(directoryInfo.FullName);
+            var videoFiles = _diskScanService.FilterFiles(directoryInfo.FullName, _diskScanService.GetVideoFiles(directoryInfo.FullName));
 
             if (downloadClientItem == null)
             {
@@ -183,7 +183,12 @@ namespace NzbDrone.Core.MediaFiles
             var decisions = _importDecisionMaker.GetImportDecisions(videoFiles.ToList(), series, downloadClientItem, folderInfo, true);
             var importResults = _importApprovedEpisodes.Import(decisions, true, downloadClientItem, importMode);
 
-            if ((downloadClientItem == null || downloadClientItem.CanMoveFiles) &&
+            if (importMode == ImportMode.Auto)
+            {
+                importMode = (downloadClientItem == null || downloadClientItem.CanMoveFiles) ? ImportMode.Move : ImportMode.Copy;
+            }
+
+            if (importMode == ImportMode.Move &&
                 importResults.Any(i => i.Result == ImportResultType.Imported) &&
                 ShouldDeleteFolder(directoryInfo, series))
             {

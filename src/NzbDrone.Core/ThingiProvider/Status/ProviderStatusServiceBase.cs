@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using NzbDrone.Core.Messaging.Events;
-using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ThingiProvider.Events;
 
 namespace NzbDrone.Core.ThingiProvider.Status
@@ -11,6 +10,7 @@ namespace NzbDrone.Core.ThingiProvider.Status
     public interface IProviderStatusServiceBase<TModel>
         where TModel : ProviderStatusBase, new()
     {
+        bool IsDisabled(int providerId);
         List<TModel> GetBlockedProviders();
         void RecordSuccess(int providerId);
         void RecordFailure(int providerId, TimeSpan minimumBackOff = default(TimeSpan));
@@ -21,25 +21,13 @@ namespace NzbDrone.Core.ThingiProvider.Status
         where TProvider : IProvider
         where TModel : ProviderStatusBase, new()
     {
-        private static readonly int[] EscalationBackOffPeriods = {
-                                                                     0,
-                                                                     5 * 60,
-                                                                     15 * 60,
-                                                                     30 * 60,
-                                                                     60 * 60,
-                                                                     3 * 60 * 60,
-                                                                     6 * 60 * 60,
-                                                                     12 * 60 * 60,
-                                                                     24 * 60 * 60
-                                                                 };
-
         protected readonly object _syncRoot = new object();
 
         protected readonly IProviderStatusRepository<TModel> _providerStatusRepository;
         protected readonly IEventAggregator _eventAggregator;
         protected readonly Logger _logger;
 
-        protected int MaximumEscalationLevel { get; set; } = EscalationBackOffPeriods.Length - 1;
+        protected int MaximumEscalationLevel { get; set; } = EscalationBackOff.Periods.Length - 1;
         protected TimeSpan MinimumTimeSinceInitialFailure { get; set; } = TimeSpan.Zero;
 
         public ProviderStatusServiceBase(IProviderStatusRepository<TModel> providerStatusRepository, IEventAggregator eventAggregator, Logger logger)
@@ -47,6 +35,11 @@ namespace NzbDrone.Core.ThingiProvider.Status
             _providerStatusRepository = providerStatusRepository;
             _eventAggregator = eventAggregator;
             _logger = logger;
+        }
+
+        public bool IsDisabled(int providerId)
+        {
+            return GetProviderStatus(providerId).IsDisabled();
         }
 
         public virtual List<TModel> GetBlockedProviders()
@@ -63,7 +56,7 @@ namespace NzbDrone.Core.ThingiProvider.Status
         {
             var level = Math.Min(MaximumEscalationLevel, status.EscalationLevel);
 
-            return TimeSpan.FromSeconds(EscalationBackOffPeriods[level]);
+            return TimeSpan.FromSeconds(EscalationBackOff.Periods[level]);
         }
 
         public virtual void RecordSuccess(int providerId)

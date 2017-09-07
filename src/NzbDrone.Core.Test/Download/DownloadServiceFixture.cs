@@ -22,6 +22,7 @@ namespace NzbDrone.Core.Test.Download
     {
         private RemoteEpisode _parseResult;
         private List<IDownloadClient> _downloadClients;
+
         [SetUp]
         public void Setup()
         {
@@ -82,7 +83,7 @@ namespace NzbDrone.Core.Test.Download
         {
             var mock = WithUsenetClient();
             mock.Setup(s => s.Download(It.IsAny<RemoteEpisode>()));
-            
+
             Subject.DownloadReport(_parseResult);
 
             VerifyEventPublished<EpisodeGrabbedEvent>();
@@ -93,7 +94,7 @@ namespace NzbDrone.Core.Test.Download
         {
             var mock = WithUsenetClient();
             mock.Setup(s => s.Download(It.IsAny<RemoteEpisode>()));
-            
+
             Subject.DownloadReport(_parseResult);
 
             mock.Verify(s => s.Download(It.IsAny<RemoteEpisode>()), Times.Once());
@@ -117,7 +118,7 @@ namespace NzbDrone.Core.Test.Download
             var mock = WithUsenetClient();
             mock.Setup(s => s.Download(It.IsAny<RemoteEpisode>()))
                 .Callback<RemoteEpisode>(v => {
-                    throw new ReleaseDownloadException(v.Release, "Error", new WebException()); 
+                    throw new ReleaseDownloadException(v.Release, "Error", new WebException());
                 });
 
             Assert.Throws<ReleaseDownloadException>(() => Subject.DownloadReport(_parseResult));
@@ -136,7 +137,7 @@ namespace NzbDrone.Core.Test.Download
             var mock = WithUsenetClient();
             mock.Setup(s => s.Download(It.IsAny<RemoteEpisode>()))
                 .Callback<RemoteEpisode>(v => {
-                    throw new ReleaseDownloadException(v.Release, "Error", new TooManyRequestsException(request, response)); 
+                    throw new ReleaseDownloadException(v.Release, "Error", new TooManyRequestsException(request, response));
                 });
 
             Assert.Throws<ReleaseDownloadException>(() => Subject.DownloadReport(_parseResult));
@@ -180,14 +181,27 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
-        public void should_not_attempt_download_if_client_isnt_configure()
+        public void should_not_attempt_download_if_client_isnt_configured()
         {
-            Subject.DownloadReport(_parseResult);
+            Assert.Throws<DownloadClientUnavailableException>(() => Subject.DownloadReport(_parseResult));
 
             Mocker.GetMock<IDownloadClient>().Verify(c => c.Download(It.IsAny<RemoteEpisode>()), Times.Never());
             VerifyEventNotPublished<EpisodeGrabbedEvent>();
+        }
 
-            ExceptionVerification.ExpectedWarns(1);
+        [Test]
+        public void should_not_attempt_download_if_client_is_disabled()
+        {
+            WithUsenetClient();
+
+            Mocker.GetMock<IDownloadClientStatusService>()
+                  .Setup(v => v.IsDisabled(It.IsAny<int>()))
+                  .Returns(true);
+
+            Assert.Throws<DownloadClientUnavailableException>(() => Subject.DownloadReport(_parseResult));
+
+            Mocker.GetMock<IDownloadClient>().Verify(c => c.Download(It.IsAny<RemoteEpisode>()), Times.Never());
+            VerifyEventNotPublished<EpisodeGrabbedEvent>();
         }
 
         [Test]

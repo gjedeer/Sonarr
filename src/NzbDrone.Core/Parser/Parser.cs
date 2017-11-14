@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -262,6 +262,9 @@ namespace NzbDrone.Core.Parser
         private static readonly Regex CleanTorrentSuffixRegex = new Regex(@"\[(?:ettv|rartv|rarbg|cttv)\]$",
                                                                    RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        private static readonly Regex CleanQualityBracketsRegex = new Regex(@"\[[a-z0-9 ._-]+\]$",
+                                                                   RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         private static readonly Regex ReleaseGroupRegex = new Regex(@"-(?<releasegroup>[a-z0-9]+)(?<!WEB-DL|480p|720p|1080p|2160p)(?:\b|[-._ ])",
                                                                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -328,6 +331,16 @@ namespace NzbDrone.Core.Parser
                 simpleTitle = WebsitePrefixRegex.Replace(simpleTitle, string.Empty);
 
                 simpleTitle = CleanTorrentSuffixRegex.Replace(simpleTitle, string.Empty);
+
+                simpleTitle = CleanQualityBracketsRegex.Replace(simpleTitle, m =>
+                {
+                    if (QualityParser.ParseQualityName(m.Value).Quality != Qualities.Quality.Unknown)
+                    {
+                        return string.Empty;
+                    }
+
+                    return m.Value;
+                });
 
                 var airDateMatch = AirDateRegex.Match(simpleTitle);
                 if (airDateMatch.Success)
@@ -602,9 +615,12 @@ namespace NzbDrone.Core.Parser
 
                     if (!episodeCaptures.Any() && !absoluteEpisodeCaptures.Any())
                     {
-                        //Check to see if this is an "Extras" or "SUBPACK" release, if it is, return NULL
-                        //Todo: Set a "Extras" flag in EpisodeParseResult if we want to download them ever
-                        if (!matchCollection[0].Groups["extras"].Value.IsNullOrWhiteSpace()) return null;
+                        //Check to see if this is an "Extras" or "SUBPACK" release, if it is, set
+                        // IsSeasonExtra so they can be filtered out
+                        if (!matchCollection[0].Groups["extras"].Value.IsNullOrWhiteSpace())
+                        {
+                            result.IsSeasonExtra = true;
+                        }
 
                         // Partial season packs will have a seasonpart group so they can be differentiated
                         // from a full season/single episode release
